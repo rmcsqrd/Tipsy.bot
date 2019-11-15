@@ -24,7 +24,7 @@ CLEAN_SUBPROJECTS=${CLEAN_SUBPROJECTS_${SUBPROJECTS}}
 
 
 # Project Name
-PROJECTNAME=FinalProject.X
+PROJECTNAME=TipsyBot.X
 
 # Active Configuration
 DEFAULTCONF=default
