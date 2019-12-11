@@ -118,7 +118,7 @@ void Initial() {
     SSPCON1bits.SSPM3 = 0;  // SSPM = 0000
     SSPCON1bits.SSPM2 = 0;
     SSPCON1bits.SSPM1 = 0;
-    SSPCON1bits.SSPM0 = 1;
+    SSPCON1bits.SSPM0 = 0;
     TRISBbits.TRISB2 = 0;    // use RB2 as CS for SPI, set as output
     LATBbits.LATB2 = 1;     // write RB2 high until SPI communication initiated
     SSPCON1bits.SSPEN = 1;  // enable MMSP
@@ -189,15 +189,15 @@ uint8_t WriteIMU(uint8_t address, uint8_t command){
 uint8_t ReadIMU(uint8_t address){
     address = readMask | address;   // mask readMask with address so MSB = 1 for read
     
-    LATBbits.LATB2 = 1;             // write CS low to initiate transfer
-//    IMU_read_garbage = SSPBUF;      // read garbage from SSP buffer
+    LATBbits.LATB2 = 0;             // write CS low to initiate transfer
+    IMU_read_garbage = SSPBUF;      // read garbage from SSP buffer
     SSPBUF = address;               // write address to read from
     while(SSPSTATbits.BF == 0){}    // sit tight until receive complete
     IMU_output = SSPBUF;            // read output from SSP buffer
-    SSPBUF = 0x00;               // write address to read from
+    SSPBUF = address;               // write address to read from
     while(SSPSTATbits.BF == 0){}    // sit tight until receive complete
     IMU_output = SSPBUF;            // read output from SSP buffer
-    LATBbits.LATB2 = 0;             // write CS high to stop transfer
+    LATBbits.LATB2 = 1;             // write CS high to stop transfer
     return IMU_output;
 }
 
