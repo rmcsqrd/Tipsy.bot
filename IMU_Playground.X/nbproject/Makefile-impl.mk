@@ -24,7 +24,7 @@ CLEAN_SUBPROJECTS=${CLEAN_SUBPROJECTS_${SUBPROJECTS}}
 
 
 # Project Name
-PROJECTNAME=UBW_Test.X
+PROJECTNAME=IMU_Playground.X
 
 # Active Configuration
 DEFAULTCONF=default

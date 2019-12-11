@@ -57,17 +57,17 @@ OBJECTDIR=build/${CND_CONF}/${IMAGE_TYPE}
 DISTDIR=dist/${CND_CONF}/${IMAGE_TYPE}
 
 # Source Files Quoted if spaced
-SOURCEFILES_QUOTED_IF_SPACED=MotorDriver.c
+SOURCEFILES_QUOTED_IF_SPACED=TipsyDriver.c
 
 # Object Files Quoted if spaced
-OBJECTFILES_QUOTED_IF_SPACED=${OBJECTDIR}/MotorDriver.p1
-POSSIBLE_DEPFILES=${OBJECTDIR}/MotorDriver.p1.d
+OBJECTFILES_QUOTED_IF_SPACED=${OBJECTDIR}/TipsyDriver.p1
+POSSIBLE_DEPFILES=${OBJECTDIR}/TipsyDriver.p1.d
 
 # Object Files
-OBJECTFILES=${OBJECTDIR}/MotorDriver.p1
+OBJECTFILES=${OBJECTDIR}/TipsyDriver.p1
 
 # Source Files
-SOURCEFILES=MotorDriver.c
+SOURCEFILES=TipsyDriver.c
 
 
 CFLAGS=
@@ -93,22 +93,22 @@ MP_PROCESSOR_OPTION=18F2553
 # ------------------------------------------------------------------------------------
 # Rules for buildStep: compile
 ifeq ($(TYPE_IMAGE), DEBUG_RUN)
-${OBJECTDIR}/MotorDriver.p1: MotorDriver.c  nbproject/Makefile-${CND_CONF}.mk
+${OBJECTDIR}/TipsyDriver.p1: TipsyDriver.c  nbproject/Makefile-${CND_CONF}.mk
 	@${MKDIR} "${OBJECTDIR}" 
-	@${RM} ${OBJECTDIR}/MotorDriver.p1.d 
-	@${RM} ${OBJECTDIR}/MotorDriver.p1 
-	${MP_CC} $(MP_EXTRA_CC_PRE) -mcpu=$(MP_PROCESSOR_OPTION) -c  -D__DEBUG=1  -fno-short-double -fno-short-float -memi=wordwrite -O0 -fasmfile -maddrqual=ignore -xassembler-with-cpp -mwarn=-3 -Wa,-a -DXPRJ_default=$(CND_CONF)  -msummary=-psect,-class,+mem,-hex,-file  -ginhx032 -Wl,--data-init -mno-keep-startup -mno-download -mdefault-config-bits $(COMPARISON_BUILD)  -std=c99 -gdwarf-3 -mstack=compiled:auto:auto:auto     -o ${OBJECTDIR}/MotorDriver.p1 MotorDriver.c 
-	@-${MV} ${OBJECTDIR}/MotorDriver.d ${OBJECTDIR}/MotorDriver.p1.d 
-	@${FIXDEPS} ${OBJECTDIR}/MotorDriver.p1.d $(SILENT) -rsi ${MP_CC_DIR}../  
+	@${RM} ${OBJECTDIR}/TipsyDriver.p1.d 
+	@${RM} ${OBJECTDIR}/TipsyDriver.p1 
+	${MP_CC} $(MP_EXTRA_CC_PRE) -mcpu=$(MP_PROCESSOR_OPTION) -c  -D__DEBUG=1  -fno-short-double -fno-short-float -memi=wordwrite -O0 -fasmfile -maddrqual=ignore -xassembler-with-cpp -mwarn=-3 -Wa,-a -DXPRJ_default=$(CND_CONF)  -msummary=-psect,-class,+mem,-hex,-file  -ginhx032 -Wl,--data-init -mno-keep-startup -mno-download -mdefault-config-bits $(COMPARISON_BUILD)  -std=c99 -gdwarf-3 -mstack=compiled:auto:auto:auto     -o ${OBJECTDIR}/TipsyDriver.p1 TipsyDriver.c 
+	@-${MV} ${OBJECTDIR}/TipsyDriver.d ${OBJECTDIR}/TipsyDriver.p1.d 
+	@${FIXDEPS} ${OBJECTDIR}/TipsyDriver.p1.d $(SILENT) -rsi ${MP_CC_DIR}../  
 	
 else
-${OBJECTDIR}/MotorDriver.p1: MotorDriver.c  nbproject/Makefile-${CND_CONF}.mk
+${OBJECTDIR}/TipsyDriver.p1: TipsyDriver.c  nbproject/Makefile-${CND_CONF}.mk
 	@${MKDIR} "${OBJECTDIR}" 
-	@${RM} ${OBJECTDIR}/MotorDriver.p1.d 
-	@${RM} ${OBJECTDIR}/MotorDriver.p1 
-	${MP_CC} $(MP_EXTRA_CC_PRE) -mcpu=$(MP_PROCESSOR_OPTION) -c  -fno-short-double -fno-short-float -memi=wordwrite -O0 -fasmfile -maddrqual=ignore -xassembler-with-cpp -mwarn=-3 -Wa,-a -DXPRJ_default=$(CND_CONF)  -msummary=-psect,-class,+mem,-hex,-file  -ginhx032 -Wl,--data-init -mno-keep-startup -mno-download -mdefault-config-bits $(COMPARISON_BUILD)  -std=c99 -gdwarf-3 -mstack=compiled:auto:auto:auto     -o ${OBJECTDIR}/MotorDriver.p1 MotorDriver.c 
-	@-${MV} ${OBJECTDIR}/MotorDriver.d ${OBJECTDIR}/MotorDriver.p1.d 
-	@${FIXDEPS} ${OBJECTDIR}/MotorDriver.p1.d $(SILENT) -rsi ${MP_CC_DIR}../  
+	@${RM} ${OBJECTDIR}/TipsyDriver.p1.d 
+	@${RM} ${OBJECTDIR}/TipsyDriver.p1 
+	${MP_CC} $(MP_EXTRA_CC_PRE) -mcpu=$(MP_PROCESSOR_OPTION) -c  -fno-short-double -fno-short-float -memi=wordwrite -O0 -fasmfile -maddrqual=ignore -xassembler-with-cpp -mwarn=-3 -Wa,-a -DXPRJ_default=$(CND_CONF)  -msummary=-psect,-class,+mem,-hex,-file  -ginhx032 -Wl,--data-init -mno-keep-startup -mno-download -mdefault-config-bits $(COMPARISON_BUILD)  -std=c99 -gdwarf-3 -mstack=compiled:auto:auto:auto     -o ${OBJECTDIR}/TipsyDriver.p1 TipsyDriver.c 
+	@-${MV} ${OBJECTDIR}/TipsyDriver.d ${OBJECTDIR}/TipsyDriver.p1.d 
+	@${FIXDEPS} ${OBJECTDIR}/TipsyDriver.p1.d $(SILENT) -rsi ${MP_CC_DIR}../  
 	
 endif
 

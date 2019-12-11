@@ -3,8 +3,8 @@
     <type>com.microchip.mplab.nbide.embedded.makeproject</type>
     <configuration>
         <data xmlns="http://www.netbeans.org/ns/make-project/1">
-            <name>UBW_Test</name>
-            <creation-uuid>6f38df64-fb81-4780-9be9-e819c944d1ee</creation-uuid>
+            <name>IMU_Playground</name>
+            <creation-uuid>360c0fac-5e1d-418e-96be-dfa802e9f641</creation-uuid>
             <make-project-type>0</make-project-type>
             <c-extensions>c</c-extensions>
             <cpp-extensions/>
