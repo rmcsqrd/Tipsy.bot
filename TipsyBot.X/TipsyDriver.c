@@ -51,10 +51,11 @@ unsigned long temp = 0;                  // temp counter for blink alive
 
 // IMU variables
 uint8_t readMask = 0b10000000;      // mask for addresses (MSB=1 for Read per IMU documentation)
-uint8_t writeMask = 0b00000000;     // mask for addresses (MSB=0 for Read per IMU documentation)
 uint8_t IMU_identity = 0;           // IMU identity from calling IMU_whoami. Should always be 0xEA if IMU SPI is working
 uint8_t IMU_read_garbage = 0;       // write only dump variable for IMU SPI communication, should never be read from because contents is variable
 uint8_t IMU_output = 0;             // output variable for IMU responses
+uint16_t Accel = 0;                // variable for accelerometer
+uint16_t Gyro = 0;
 
 /******************************************************************************
  * Function prototypes
@@ -72,20 +73,26 @@ uint8_t WriteIMU(uint8_t address, uint8_t command); // master function to readin
 uint8_t ReadIMU(uint8_t address);   // master function for reading IMU by address. Returns output from IMU
 void IMU_whoami(void);              // function to verify IMU is working properly
 void IMU_BSR0_Select(void);         // function to force select user bank 0 on IMU
+void IMU_accel(void);               // function to read accelerometer
+void IMU_gyro(void);                // funciton to read gyro
 
 /******************************************************************************
  * main()
  ******************************************************************************/
 void main(){
     Initial();
-//    IMU_BSR0_Select();             // select IMU User Bank Select 0 via SPI comm
+//    IMU_whoami();             // check on identity of IMU
+
       while(1) {                   // do this loop forever
+//          IMU_accel();             // check on identity of IMU
+//          IMU_whoami();
+          ReadIMU(0x03);
+          ReadIMU(0x00);
           motor_speed = 200;
           motor_orientation = 0;
           MotorDriver(motor_speed, motor_orientation);  // takes two inputs (speed (0-255) and orientation (0=CW, 1=CCW) )
 
           BlinkAlive();
-          IMU_whoami();             // check on identity of IMU
      }
 }
 
@@ -97,13 +104,6 @@ void main(){
  * both.
  ******************************************************************************/
 void Initial() {
-//    initialize motor driver bits as outputs
-    _MD_STBY_TRIS = 0;    
-    _MD_AI1_TRIS = 0;     
-    _MD_AI2_TRIS = 0;     
-    _MD_PWMA_TRIS = 0; 
-        
-    
 // initialize IMU SPI registers   
     
     SSPCON1bits.SSPEN = 0;     // disable MSSP to config it
@@ -113,17 +113,32 @@ void Initial() {
 
     
     SSPSTATbits.SMP = 1;    // input sampled at end of output time (tuning knob)
-    SSPSTATbits.CKE = 1;    // transmit occurs on transfer from active to idle clock state
-    SSPCON1bits.CKP = 1;    // clock idle is high state (tuning knob)
+    SSPSTATbits.CKE = 1;    // transmit occurs on transfer from active to idle clock state (tuning knob)
+    SSPCON1bits.CKP = 1;    // clock idle is high state 
     SSPCON1bits.SSPM3 = 0;  // SSPM = 0000
     SSPCON1bits.SSPM2 = 0;
-    SSPCON1bits.SSPM1 = 0;
+    SSPCON1bits.SSPM1 = 1;
     SSPCON1bits.SSPM0 = 0;
     TRISBbits.TRISB2 = 0;    // use RB2 as CS for SPI, set as output
     LATBbits.LATB2 = 1;     // write RB2 high until SPI communication initiated
     SSPCON1bits.SSPEN = 1;  // enable MMSP
     
+    __delay_ms(11);
+    WriteIMU(0x7F, 0x00);
+    WriteIMU(0x03, 0xD0);        // write IMU I2X_IF_DIS bit to disable I2C comm//
+    __delay_ms(1000);
+    ReadIMU(0x03);
+    __delay_ms(1000);
 
+
+
+    
+    //    initialize motor driver bits as outputs
+    _MD_STBY_TRIS = 0;    
+    _MD_AI1_TRIS = 0;     
+    _MD_AI2_TRIS = 0;     
+    _MD_PWMA_TRIS = 0; 
+        
 
 //    initialize blinkalive LEDs
     TRISCbits.TRISC0 = 0;
@@ -157,8 +172,42 @@ void Initial() {
 
 void IMU_whoami(){
 //    test function to verify SPI communication is working properly. Should return 0xEA
-    uint8_t address = 0x00;
-    IMU_identity = ReadIMU(address);
+    uint8_t IdentityAddress = 0x00;
+    IMU_identity = ReadIMU(IdentityAddress);
+}
+    
+
+uint8_t WriteIMU(uint8_t address, uint8_t command){    
+    LATBbits.LATB2 = 0;             // write CS low to initiate transfer
+    SSPBUF = address;               // write address to send command to
+    while(SSPSTATbits.BF == 0){ }   // sit tight until receive complete
+    IMU_read_garbage = SSPBUF;      // read garbage from SSP buffer to clear BF
+    
+    SSPBUF = command;               // write command to send
+    while(SSPSTATbits.BF == 0){ }   // sit tight until receive complete
+    IMU_output = SSPBUF;     // read garbage from SSP buffer
+    LATBbits.LATB2 = 1;             // drive CS high to end transfer
+    
+    return IMU_output;              // return IMU response after data word transmit (not sure what this should be)
+    
+}
+
+uint8_t ReadIMU(uint8_t address){             // syntax reformat lightly inspired by https://github.com/sparkfun/SparkFun_MPU-9250_Breakout_Arduino_Library/blob/master/examples/MPU9250_Debug/MPU9250_Debug.ino
+    return WriteIMU(address | readMask, 0xFF); // mask address with read mask. Give garbage data to write
+}
+
+void IMU_accel(){
+    uint8_t AccelAddressH = 0x31;
+    uint8_t AccelAddressL = 0x32;
+    Accel = ReadIMU(AccelAddressL);
+    
+    
+    
+    
+}
+
+void IMU_gyro(){
+    uint8_t address = 0x2B;
     
 }
 
@@ -167,38 +216,6 @@ void IMU_BSR0_Select(){
     uint8_t address = 0x7F;
     uint8_t command = 0x00;
     IMU_read_garbage = WriteIMU(address, command);
-}
-
-uint8_t WriteIMU(uint8_t address, uint8_t command){
-    address = readMask & address;   // mask address and command with Read and Write bits respectively
-    command = writeMask & command;
-    
-    LATBbits.LATB4 = 0;             // write CS low to initiate transfer
-    IMU_read_garbage = SSPBUF;     // read garbage from SSP buffer to clear it
-    SSPBUF = address;              // write address to send command to
-    while(SSPSTATbits.BF == 0){}   // sit tight until receive complete
-    IMU_read_garbage = SSPBUF;     // read garbage from SSP buffer
-    
-    SSPBUF = command;              // write command to send
-    while(SSPSTATbits.BF == 0){}   // sit tight until receive complete
-    IMU_output = SSPBUF;     // read garbage from SSP buffer
-    LATBbits.LATB2 = 1;             // drive CS high to end transfer
-    return IMU_output;              // return IMU response after data word transmit (not sure what this should be)
-}
-
-uint8_t ReadIMU(uint8_t address){
-    address = readMask | address;   // mask readMask with address so MSB = 1 for read
-    
-    LATBbits.LATB2 = 0;             // write CS low to initiate transfer
-    IMU_read_garbage = SSPBUF;      // read garbage from SSP buffer
-    SSPBUF = address;               // write address to read from
-    while(SSPSTATbits.BF == 0){}    // sit tight until receive complete
-    IMU_output = SSPBUF;            // read output from SSP buffer
-    SSPBUF = address;               // write address to read from
-    while(SSPSTATbits.BF == 0){}    // sit tight until receive complete
-    IMU_output = SSPBUF;            // read output from SSP buffer
-    LATBbits.LATB2 = 1;             // write CS high to stop transfer
-    return IMU_output;
 }
 
 void BlinkAlive(){
