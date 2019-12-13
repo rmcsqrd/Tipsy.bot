@@ -23,6 +23,7 @@
 #include <pic18f2553.h>
 #include "MotorDriver.h"
 
+
 #define _XTAL_FREQ 24000000   //Required in XC8 for delays. 16 Mhz oscillator clock
 #pragma config FOSC=HS
 #pragma PWRTEN=ON, BOREN=ON, BORV=1, CCP2MX=PORTC, XINST=OFF
@@ -54,7 +55,9 @@ uint8_t readMask = 0b10000000;      // mask for addresses (MSB=1 for Read per IM
 uint8_t IMU_identity = 0;           // IMU identity from calling IMU_whoami. Should always be 0xEA if IMU SPI is working
 uint8_t IMU_read_garbage = 0;       // write only dump variable for IMU SPI communication, should never be read from because contents is variable
 uint8_t IMU_output = 0;             // output variable for IMU responses
-uint16_t Accel = 0;                // variable for accelerometer
+uint8_t AccelXLow = 0;              // variable for accelerometer output X, low
+uint8_t AccelXHigh = 0;             // variable for accelerometer output X, high
+uint16_t AccelX = 0;                // variable for accelerometer output X, combined
 uint16_t Gyro = 0;
 
 /******************************************************************************
@@ -69,11 +72,11 @@ void TMR0handler(void);             // function for lowpri interrupts
 void BlinkAlive(void);              // blink LED's forever so I know the board is doing something
 
 // IMU Functions
-uint8_t WriteIMU(uint8_t address, uint8_t command); // master function to reading/writing IMU
-uint8_t ReadIMU(uint8_t address);   // master function for reading IMU by address. Returns output from IMU
+uint8_t WriteIMU(uint8_t address, uint8_t command, uint8_t reg); // master function to reading/writing IMU
+uint8_t ReadIMU(uint8_t address, uint8_t reg);   // master function for reading IMU by address. Returns output from IMU
 void IMU_whoami(void);              // function to verify IMU is working properly
 void IMU_BSR0_Select(void);         // function to force select user bank 0 on IMU
-void IMU_accel(void);               // function to read accelerometer
+void IMU_AccelX(void);               // function to read accelerometer
 void IMU_gyro(void);                // funciton to read gyro
 
 /******************************************************************************
@@ -81,18 +84,16 @@ void IMU_gyro(void);                // funciton to read gyro
  ******************************************************************************/
 void main(){
     Initial();
-//    IMU_whoami();             // check on identity of IMU
+    IMU_whoami();
 
       while(1) {                   // do this loop forever
-//          IMU_accel();             // check on identity of IMU
-//          IMU_whoami();
-          ReadIMU(0x03);
-          ReadIMU(0x00);
+//          IMU_AccelX();
+//          ReadIMU(0x22, 1);
+          IMU_whoami();
           motor_speed = 200;
           motor_orientation = 0;
           MotorDriver(motor_speed, motor_orientation);  // takes two inputs (speed (0-255) and orientation (0=CW, 1=CCW) )
-
-          BlinkAlive();
+         __delay_ms(10);
      }
 }
 
@@ -110,28 +111,22 @@ void Initial() {
     TRISCbits.TRISC7 = 0;       // set SDO as output
     TRISBbits.TRISB0 = 1;       // set SDI as input
     TRISBbits.TRISB1 = 0;       // set SCK as output
+    
 
     
-    SSPSTATbits.SMP = 1;    // input sampled at end of output time (tuning knob)
-    SSPSTATbits.CKE = 1;    // transmit occurs on transfer from active to idle clock state (tuning knob)
+    SSPSTATbits.SMP = 0;    // input sampled at end of output time (tuning knob)
+    SSPSTATbits.CKE = 0;    // transmit occurs on transfer from active to idle clock state (tuning knob)
     SSPCON1bits.CKP = 1;    // clock idle is high state 
-    SSPCON1bits.SSPM3 = 0;  // SSPM = 0000
+    SSPCON1bits.SSPM3 = 0;  // SSPM = 0001
     SSPCON1bits.SSPM2 = 0;
-    SSPCON1bits.SSPM1 = 1;
-    SSPCON1bits.SSPM0 = 0;
-    TRISBbits.TRISB2 = 0;    // use RB2 as CS for SPI, set as output
-    LATBbits.LATB2 = 1;     // write RB2 high until SPI communication initiated
+    SSPCON1bits.SSPM1 = 0;
+    SSPCON1bits.SSPM0 = 1;
+    TRISBbits.TRISB4 = 0;    // use RB2 as CS_AG for SPI, set as output
+    TRISBbits.TRISB3 = 0;   // use RB3 as CS_M, set as output
+    LATBbits.LATB4 = 1;     // write RB2 high until SPI communication initiated
+    LATBbits.LATB3 = 1;     // write RB3 high until SPI communication initiated
+
     SSPCON1bits.SSPEN = 1;  // enable MMSP
-    
-    __delay_ms(11);
-    WriteIMU(0x7F, 0x00);
-    WriteIMU(0x03, 0xD0);        // write IMU I2X_IF_DIS bit to disable I2C comm//
-    __delay_ms(1000);
-    ReadIMU(0x03);
-    __delay_ms(1000);
-
-
-
     
     //    initialize motor driver bits as outputs
     _MD_STBY_TRIS = 0;    
@@ -167,18 +162,31 @@ void Initial() {
     
     
     T0CONbits.TMR0ON = 1;           // Turning on TMR0
-    
+   
 }
 
 void IMU_whoami(){
 //    test function to verify SPI communication is working properly. Should return 0xEA
-    uint8_t IdentityAddress = 0x00;
-    IMU_identity = ReadIMU(IdentityAddress);
+    uint8_t IdentityAddress = 0x0F;
+    IMU_identity = ReadIMU(IdentityAddress, 0);
+}
+
+void IMU_AccelX(){
+    uint8_t AccelAddressH = 0x29;
+    uint8_t AccelAddressL = 0x28;
+    AccelXLow = ReadIMU(AccelAddressL, 0);
+    AccelXHigh = ReadIMU(AccelAddressH, 0);
 }
     
 
-uint8_t WriteIMU(uint8_t address, uint8_t command){    
-    LATBbits.LATB2 = 0;             // write CS low to initiate transfer
+uint8_t WriteIMU(uint8_t address, uint8_t command, uint8_t reg){   
+    
+    if (reg == 0){                  // 0 = accel
+        LATBbits.LATB4 = 0;             // write CS low to initiate transfer
+    }
+    if(reg == 1){                   // 1 = mag
+        LATBbits.LATB3 = 0;             // write CS low to initiate transfer
+    }
     SSPBUF = address;               // write address to send command to
     while(SSPSTATbits.BF == 0){ }   // sit tight until receive complete
     IMU_read_garbage = SSPBUF;      // read garbage from SSP buffer to clear BF
@@ -186,25 +194,17 @@ uint8_t WriteIMU(uint8_t address, uint8_t command){
     SSPBUF = command;               // write command to send
     while(SSPSTATbits.BF == 0){ }   // sit tight until receive complete
     IMU_output = SSPBUF;     // read garbage from SSP buffer
-    LATBbits.LATB2 = 1;             // drive CS high to end transfer
     
+    LATBbits.LATB4 = 1;             // drive CS high to end transfer
+    LATBbits.LATB3 = 1;             // drive CS high to end transfer
+
     return IMU_output;              // return IMU response after data word transmit (not sure what this should be)
     
 }
 
-uint8_t ReadIMU(uint8_t address){             // syntax reformat lightly inspired by https://github.com/sparkfun/SparkFun_MPU-9250_Breakout_Arduino_Library/blob/master/examples/MPU9250_Debug/MPU9250_Debug.ino
-    return WriteIMU(address | readMask, 0xFF); // mask address with read mask. Give garbage data to write
-}
-
-void IMU_accel(){
-    uint8_t AccelAddressH = 0x31;
-    uint8_t AccelAddressL = 0x32;
-    Accel = ReadIMU(AccelAddressL);
-    
-    
-    
-    
-}
+uint8_t ReadIMU(uint8_t address, uint8_t reg){             // syntax reformat lightly inspired by https://github.com/sparkfun/SparkFun_MPU-9250_Breakout_Arduino_Library/blob/master/examples/MPU9250_Debug/MPU9250_Debug.ino
+    return WriteIMU(address | readMask, 0xFF, reg); // mask address with read mask. Give garbage data to write
+}    
 
 void IMU_gyro(){
     uint8_t address = 0x2B;
@@ -215,20 +215,21 @@ void IMU_BSR0_Select(){
 //    function to select User Bank 0 as working IMU bank in initialization routine
     uint8_t address = 0x7F;
     uint8_t command = 0x00;
-    IMU_read_garbage = WriteIMU(address, command);
+    IMU_read_garbage = WriteIMU(address, command, 0);
 }
 
 void BlinkAlive(){
     // lazily blink onboard LED's forever so I know the MPU is doing something
     // count up to some arbitrary value and flip outputs to LEDs
-    if(LATCbits.LATC0 == 0 && temp == 19999){
+    if(LATCbits.LATC0 == 0 && temp == 10000){
             LATCbits.LATC0 = 1;
-            LATCbits.LATC1 = 0;
+            
             temp = 0;
         }
-    if(LATCbits.LATC0 != 0  && temp == 19999){
+    if(LATCbits.LATC0 != 0  && temp == 10000){
             LATCbits.LATC0 = 0;
-            LATCbits.LATC1 = 1;
+            
+            
             temp = 0;
         }
     
@@ -292,6 +293,8 @@ void __interrupt(low_priority) LoPriISR(void) {
                 TMR0handler();
                 continue;
             }
+            BlinkAlive();
+
             break;
         }
 }
