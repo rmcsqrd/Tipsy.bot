@@ -1,5 +1,5 @@
 
-/****** ASEN 5519 Lab 6 ******************************************************
+/****** ASEN 5519 Final Project ******************************************************
  * Author: Rio McMahon
  * Created 11/14/19
  *
@@ -29,6 +29,7 @@
 #pragma PWRTEN=ON, BOREN=ON, BORV=1, CCP2MX=PORTC, XINST=OFF
 #pragma config WDT=OFF        // clear this to turn off watchdog timer
 #pragma config LVP=OFF        // clear this, allows debug to occur
+#pragma config PBADEN=OFF     // clear 
 
 /******************************************************************************
  * Global variables
@@ -87,13 +88,13 @@ void main(){
     IMU_whoami();
 
       while(1) {                   // do this loop forever
-//          IMU_AccelX();
+          IMU_AccelX();
 //          ReadIMU(0x22, 1);
-          IMU_whoami();
+//          IMU_whoami();
           motor_speed = 200;
           motor_orientation = 0;
           MotorDriver(motor_speed, motor_orientation);  // takes two inputs (speed (0-255) and orientation (0=CW, 1=CCW) )
-         __delay_ms(10);
+         __delay_ms(500);
      }
 }
 
@@ -105,6 +106,11 @@ void main(){
  * both.
  ******************************************************************************/
 void Initial() {
+//    Set up ADC stuff to be all digital because it is interacting negatively with MSSP
+    ADCON0 = 0xFF;
+    ADCON1 = 0x0F;
+    ADCON2 = 0xFF;
+    
 // initialize IMU SPI registers   
     
     SSPCON1bits.SSPEN = 0;     // disable MSSP to config it
@@ -114,7 +120,7 @@ void Initial() {
     
 
     
-    SSPSTATbits.SMP = 0;    // input sampled at end of output time (tuning knob)
+    SSPSTATbits.SMP = 1;    // input sampled at end of output time (tuning knob)
     SSPSTATbits.CKE = 0;    // transmit occurs on transfer from active to idle clock state (tuning knob)
     SSPCON1bits.CKP = 1;    // clock idle is high state 
     SSPCON1bits.SSPM3 = 0;  // SSPM = 0001
@@ -180,21 +186,25 @@ void IMU_AccelX(){
     
 
 uint8_t WriteIMU(uint8_t address, uint8_t command, uint8_t reg){   
-    
+
     if (reg == 0){                  // 0 = accel
         LATBbits.LATB4 = 0;             // write CS low to initiate transfer
     }
     if(reg == 1){                   // 1 = mag
         LATBbits.LATB3 = 0;             // write CS low to initiate transfer
     }
-    SSPBUF = address;               // write address to send command to
-    while(SSPSTATbits.BF == 0){ }   // sit tight until receive complete
     IMU_read_garbage = SSPBUF;      // read garbage from SSP buffer to clear BF
+    SSPBUF = address;               // write address to send command to
+    while(PIR1bits.SSPIF == 0){}   // sit tight until receive complete
+    PIR1bits.SSPIF = 0;
+    IMU_read_garbage = SSPBUF;      // read garbage from SSP buffer to clear BF
+    __delay_us(10);
     
-    SSPBUF = command;               // write command to send
-    while(SSPSTATbits.BF == 0){ }   // sit tight until receive complete
+    SSPBUF = command;               // write command to send   
+    while(PIR1bits.SSPIF == 0){}   // sit tight until receive complete
+    PIR1bits.SSPIF = 0;
     IMU_output = SSPBUF;     // read garbage from SSP buffer
-    
+
     LATBbits.LATB4 = 1;             // drive CS high to end transfer
     LATBbits.LATB3 = 1;             // drive CS high to end transfer
 
@@ -203,7 +213,7 @@ uint8_t WriteIMU(uint8_t address, uint8_t command, uint8_t reg){
 }
 
 uint8_t ReadIMU(uint8_t address, uint8_t reg){             // syntax reformat lightly inspired by https://github.com/sparkfun/SparkFun_MPU-9250_Breakout_Arduino_Library/blob/master/examples/MPU9250_Debug/MPU9250_Debug.ino
-    return WriteIMU(address | readMask, 0xFF, reg); // mask address with read mask. Give garbage data to write
+    return WriteIMU(address | readMask, 0x00, reg); // mask address with read mask. Give garbage data to write
 }    
 
 void IMU_gyro(){
@@ -222,12 +232,12 @@ void BlinkAlive(){
     // lazily blink onboard LED's forever so I know the MPU is doing something
     // count up to some arbitrary value and flip outputs to LEDs
     if(LATCbits.LATC0 == 0 && temp == 10000){
-            LATCbits.LATC0 = 1;
+            LATCbits.LATC0 = 1;     // yellow light is alive LED
             
             temp = 0;
         }
     if(LATCbits.LATC0 != 0  && temp == 10000){
-            LATCbits.LATC0 = 0;
+            LATCbits.LATC0 = 0;     // yellow light is alive LED
             
             
             temp = 0;
