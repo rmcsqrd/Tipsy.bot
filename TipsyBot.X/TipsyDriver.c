@@ -61,6 +61,12 @@ uint8_t AccelXHigh = 0;             // variable for accelerometer output X, high
 uint16_t AccelX = 0;                // variable for accelerometer output X, combined
 uint16_t Gyro = 0;
 
+// SPI bit bang stuff
+uint8_t SPI_Transmit_Size = 8;              // global variable for 8bit/single byte R/W
+char SPI_OutArray[] = {0,0,0,0,0,0,0,0};    //output array to write via SPI
+char SPI_InArray[] = {0,0,0,0,0,0,0,0};
+
+
 /******************************************************************************
  * Function prototypes
  ******************************************************************************/
@@ -79,6 +85,9 @@ void IMU_whoami(void);              // function to verify IMU is working properl
 void IMU_BSR0_Select(void);         // function to force select user bank 0 on IMU
 void IMU_AccelX(void);               // function to read accelerometer
 void IMU_gyro(void);                // funciton to read gyro
+void SPIGenOutArray(uint8_t data); // function to convert address into array of ones and zeros
+uint8_t SPIGenInArray(void);        // function to convert data recieved from SPI into hex value
+void SPITransmit(void);     // function to transmit SPI data
 
 /******************************************************************************
  * main()
@@ -88,13 +97,13 @@ void main(){
     IMU_whoami();
 
       while(1) {                   // do this loop forever
-          IMU_AccelX();
+//          IMU_AccelX();
 //          ReadIMU(0x22, 1);
-//          IMU_whoami();
+          IMU_whoami();
           motor_speed = 200;
           motor_orientation = 0;
           MotorDriver(motor_speed, motor_orientation);  // takes two inputs (speed (0-255) and orientation (0=CW, 1=CCW) )
-         __delay_ms(500);
+//         __delay_ms(500);
      }
 }
 
@@ -107,32 +116,21 @@ void main(){
  ******************************************************************************/
 void Initial() {
 //    Set up ADC stuff to be all digital because it is interacting negatively with MSSP
-    ADCON0 = 0xFF;
+    ADCON0 = 0x00;
     ADCON1 = 0x0F;
-    ADCON2 = 0xFF;
+    ADCON2 = 0x00;
     
 // initialize IMU SPI registers   
-    
-    SSPCON1bits.SSPEN = 0;     // disable MSSP to config it
     TRISCbits.TRISC7 = 0;       // set SDO as output
-    TRISBbits.TRISB0 = 1;       // set SDI as input
+    TRISBbits.TRISB0 = 1;       // set SDI as input  DO NOT CHANGE THIS!!!!
     TRISBbits.TRISB1 = 0;       // set SCK as output
-    
-
-    
-    SSPSTATbits.SMP = 1;    // input sampled at end of output time (tuning knob)
-    SSPSTATbits.CKE = 0;    // transmit occurs on transfer from active to idle clock state (tuning knob)
-    SSPCON1bits.CKP = 1;    // clock idle is high state 
-    SSPCON1bits.SSPM3 = 0;  // SSPM = 0001
-    SSPCON1bits.SSPM2 = 0;
-    SSPCON1bits.SSPM1 = 0;
-    SSPCON1bits.SSPM0 = 1;
     TRISBbits.TRISB4 = 0;    // use RB2 as CS_AG for SPI, set as output
     TRISBbits.TRISB3 = 0;   // use RB3 as CS_M, set as output
+    
     LATBbits.LATB4 = 1;     // write RB2 high until SPI communication initiated
     LATBbits.LATB3 = 1;     // write RB3 high until SPI communication initiated
-
-    SSPCON1bits.SSPEN = 1;  // enable MMSP
+    LATCbits.LATC7 = 0;     // MOSI idle state is low
+    LATBbits.LATB1 = 1;     // SCK idle state is high
     
     //    initialize motor driver bits as outputs
     _MD_STBY_TRIS = 0;    
@@ -147,7 +145,7 @@ void Initial() {
     
     TRISBbits.TRISB6 = 0;  // drive these pins low because rat tail programming line leads were causing grounding issues
     TRISBbits.TRISB7 = 0;
-    
+        
     
 //    set up interrupts to handle PWM generation
 //    initialize TMR0
@@ -166,9 +164,12 @@ void Initial() {
     INTCONbits.GIEL = 1;            // Enable low-priority interrupts to CPU
     INTCONbits.GIEH = 1;            // Enable all interrupts
     
+//    initialize IMU
+    
     
     T0CONbits.TMR0ON = 1;           // Turning on TMR0
    
+    
 }
 
 void IMU_whoami(){
@@ -177,38 +178,44 @@ void IMU_whoami(){
     IMU_identity = ReadIMU(IdentityAddress, 0);
 }
 
-void IMU_AccelX(){
-    uint8_t AccelAddressH = 0x29;
-    uint8_t AccelAddressL = 0x28;
+void IMU_AccelZ(){
+    uint8_t AccelAddressH = 0x2C;
+    uint8_t AccelAddressL = 0x2D;
     AccelXLow = ReadIMU(AccelAddressL, 0);
     AccelXHigh = ReadIMU(AccelAddressH, 0);
 }
     
 
 uint8_t WriteIMU(uint8_t address, uint8_t command, uint8_t reg){   
-
+    INTCONbits.GIEL = 0;            // Disable low-priority interrupts to CPU
+    INTCONbits.GIEH = 0;            // Disable all interrupts    
+    
+    
     if (reg == 0){                  // 0 = accel
         LATBbits.LATB4 = 0;             // write CS low to initiate transfer
     }
     if(reg == 1){                   // 1 = mag
         LATBbits.LATB3 = 0;             // write CS low to initiate transfer
     }
-    IMU_read_garbage = SSPBUF;      // read garbage from SSP buffer to clear BF
-    SSPBUF = address;               // write address to send command to
-    while(PIR1bits.SSPIF == 0){}   // sit tight until receive complete
-    PIR1bits.SSPIF = 0;
-    IMU_read_garbage = SSPBUF;      // read garbage from SSP buffer to clear BF
-    __delay_us(10);
-    
-    SSPBUF = command;               // write command to send   
-    while(PIR1bits.SSPIF == 0){}   // sit tight until receive complete
-    PIR1bits.SSPIF = 0;
-    IMU_output = SSPBUF;     // read garbage from SSP buffer
+    __delay_us(3);                  // wait a little bit
+    SPIGenOutArray(address);        // generate the address transmit array
+    SPITransmit();                  // transmit the address
+    LATCbits.LATC7 = 1;             // drive SDO high between address and command transmit
+    __delay_us(3);                  // wait a little bit
+    SPIGenOutArray(command);        // generate the command transmit array
+    SPITransmit();                  // transmit the command
+    __delay_us(3);                  // wait a little bit
+    LATCbits.LATC7 = 0;             // drive the SDO line low
 
     LATBbits.LATB4 = 1;             // drive CS high to end transfer
     LATBbits.LATB3 = 1;             // drive CS high to end transfer
 
-    return IMU_output;              // return IMU response after data word transmit (not sure what this should be)
+    INTCONbits.GIEL = 1;            // Enable low-priority interrupts to CPU
+    INTCONbits.GIEH = 1;            // Enable all interrupts
+    
+    uint8_t results = SPIGenInArray();  // process results from SPI
+    IMU_output = results;
+    return results;              // return IMU response after data word transmit (not sure what this should be)
     
 }
 
@@ -221,12 +228,6 @@ void IMU_gyro(){
     
 }
 
-void IMU_BSR0_Select(){
-//    function to select User Bank 0 as working IMU bank in initialization routine
-    uint8_t address = 0x7F;
-    uint8_t command = 0x00;
-    IMU_read_garbage = WriteIMU(address, command, 0);
-}
 
 void BlinkAlive(){
     // lazily blink onboard LED's forever so I know the MPU is doing something
@@ -284,6 +285,46 @@ void MotorDriver(unsigned char speed, unsigned char orientation){
  * Included to show form, does nothing
  ******************************************************************************/
 
+//// Bit-banged SPI////
+// why did you do it this way? 
+//      1) because hardware is for masochists and I've learned to love the pain
+//      2) because the PIC18F2553 has issues with its SSPBUF I think
+
+void SPIGenOutArray(uint8_t data){
+    uint8_t cnt = 0;
+    uint8_t mask = 0x80;         // b10000000
+    while(cnt < SPI_Transmit_Size){
+        SPI_OutArray[cnt] = (data << cnt) & mask;    // shift based on count and mask
+        SPI_OutArray[cnt] = SPI_OutArray[cnt] >> 7;     // shift result back to LSB (either one or zero)
+        cnt++;
+    }
+}
+
+uint8_t SPIGenInArray(void){
+    uint8_t result = 0x00;
+    uint8_t cnt = 0;
+    while(cnt < SPI_Transmit_Size){
+        result = result | (SPI_InArray[cnt] << ((SPI_Transmit_Size - 1)-cnt));
+        cnt++;
+    }
+    return result;
+}
+
+void SPITransmit(void){
+    uint8_t cnt = 0;
+    while(cnt < SPI_Transmit_Size){
+        if(SPI_OutArray[cnt] == 1){LATCbits.LATC7 = 1;}  // write SDO low or high based on bit in array
+        else{ LATCbits.LATC7 = 0;}
+        LATBbits.LATB1 = 0;                              // drive SCK low
+        __delay_us(1);
+        if(PORTBbits.RB0 == 1){SPI_InArray[cnt] = 0x01;} // write status of SDI into array
+        else{SPI_InArray[cnt] = 0x00;}
+        LATBbits.LATB1 = 1;                              // drive SCK high
+        __delay_us(1);
+        cnt++;
+    }
+}
+//// Interrupt Stuff ////
 void __interrupt() HiPriISR(void) {
   
 }	
@@ -333,3 +374,5 @@ void TMR0handler() {
     INTCONbits.TMR0IF = 0;
     }
     
+
+
