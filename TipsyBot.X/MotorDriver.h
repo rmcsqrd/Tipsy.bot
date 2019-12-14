@@ -15,6 +15,8 @@
  ******************************************************************************/
 
 #include <xc.h>
+#include <stdint.h>
+
 
 #ifndef _MotorDriver_
 #define _MotorDriver_

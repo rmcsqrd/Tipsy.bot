@@ -22,6 +22,7 @@
 #include <stdint.h>
 #include <pic18f2553.h>
 #include "MotorDriver.h"
+#include "SPI_Driver.h"
 
 
 #define _XTAL_FREQ 24000000   //Required in XC8 for delays. 16 Mhz oscillator clock
@@ -34,16 +35,11 @@
 /******************************************************************************
  * Global variables
  ******************************************************************************/
-char  xtest      = 250;
-char  temptest[] = "Accel1";
-int   ytest      = -2;
-int  *ztest      = &ytest;
-char *atest;
 
 // Motor Driver Variables
-char Motor_PWM_status = 0;          // status of the motor PWM 
-unsigned short Motor_PWM_cnt = 0;   // counter for motor PWM signal on TMR0
-unsigned short PWM_max = 0;         // what motor_PWM_cnt counts up to, changes based on Motor_PWM_status
+char Motor_PWM_status;          // status of the motor PWM 
+unsigned short Motor_PWM_cnt;   // counter for motor PWM signal on TMR0
+unsigned short PWM_max;         // what motor_PWM_cnt counts up to, changes based on Motor_PWM_status
 unsigned short motor_speed = 0;     // speed (0-65535) of motor
 unsigned char motor_orientation = 0;// orientation (0=CW, 1=CCW)
 uint8_t fall_status = 0;            // bit to detect if bot has fallen and toggles RC1 LED
@@ -58,11 +54,6 @@ uint8_t IMU_read_garbage = 0;       // write only dump variable for IMU SPI comm
 uint8_t IMU_output = 0;             // output variable for IMU responses
 int16_t AccelZ = 0;                // variable for accelerometer output Z, combined
 uint16_t Gyro = 0;
-
-// SPI bit bang stuff
-uint8_t SPI_Transmit_Size = 8;              // global variable for 8bit/single byte R/W
-char SPI_OutArray[] = {0,0,0,0,0,0,0,0};    //output array to write via SPI
-char SPI_InArray[] = {0,0,0,0,0,0,0,0};
 
 
 /******************************************************************************
@@ -84,9 +75,6 @@ void IMU_whoami(void);              // function to verify IMU is working properl
 void IMU_BSR0_Select(void);         // function to force select user bank 0 on IMU
 void IMU_AccelZ(void);               // function to read accelerometer
 void IMU_gyro(void);                // funciton to read gyro
-void SPIGenOutArray(uint8_t data); // function to convert address into array of ones and zeros
-uint8_t SPIGenInArray(void);        // function to convert data recieved from SPI into hex value
-void SPITransmit(void);     // function to transmit SPI data
 
 
 /******************************************************************************
@@ -266,82 +254,12 @@ void BlinkAlive(){
     temp++;
     
 }
-    
-void MotorDriver(unsigned char speed, unsigned char orientation){
-
-    // update value of the PWMA pin on motor driver to match the PWM status on TMR0
-    _MD_PWMA = Motor_PWM_status;
-    
-    // check if speed = 0 or if fall condition bit it high; if yes set standby bit low so motors don't operate
-    if(speed == 0 || fall_status == 1){
-        _MD_STBY = 0;
-    }
-    
-        else{
-            _MD_STBY = 1;
-    }
-    
-    // check if orientation = 1 or 0, adjust input pins accordingly
-    if(orientation == 0){
-        _MD_AI1 = 0;
-        _MD_AI2 = 1;
-    }
-    
-    if(orientation == 1){
-        _MD_AI1 = 1;
-        _MD_AI2 = 0;
-    }
-
-    
-    
-    
-    
-}
+   
 /******************************************************************************
  * HiPriISR interrupt service routine
  *
  * Included to show form, does nothing
  ******************************************************************************/
-
-//// Bit-banged SPI////
-// why did you do it this way? 
-//      1) because hardware is for masochists and I've learned to love the pain
-//      2) because the PIC18F2553 has issues with its SSPBUF I think
-
-void SPIGenOutArray(uint8_t data){
-    uint8_t cnt = 0;
-    uint8_t mask = 0x80;         // b10000000
-    while(cnt < SPI_Transmit_Size){
-        SPI_OutArray[cnt] = (data << cnt) & mask;    // shift based on count and mask
-        SPI_OutArray[cnt] = SPI_OutArray[cnt] >> 7;     // shift result back to LSB (either one or zero)
-        cnt++;
-    }
-}
-
-uint8_t SPIGenInArray(void){
-    uint8_t result = 0x00;
-    uint8_t cnt = 0;
-    while(cnt < SPI_Transmit_Size){
-        result = result | (SPI_InArray[cnt] << ((SPI_Transmit_Size - 1)-cnt));
-        cnt++;
-    }
-    return result;
-}
-
-void SPITransmit(void){
-    uint8_t cnt = 0;
-    while(cnt < SPI_Transmit_Size){
-        if(SPI_OutArray[cnt] == 1){LATCbits.LATC7 = 1;}  // write SDO low or high based on bit in array
-        else{ LATCbits.LATC7 = 0;}
-        LATBbits.LATB1 = 0;                              // drive SCK low
-        __delay_us(1);
-        if(PORTBbits.RB0 == 1){SPI_InArray[cnt] = 0x01;} // write status of SDI into array
-        else{SPI_InArray[cnt] = 0x00;}
-        LATBbits.LATB1 = 1;                              // drive SCK high
-        __delay_us(1);
-        cnt++;
-    }
-}
 //// Interrupt Stuff ////
 void __interrupt() HiPriISR(void) {
   
