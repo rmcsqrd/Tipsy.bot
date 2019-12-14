@@ -46,7 +46,7 @@ unsigned short Motor_PWM_cnt = 0;   // counter for motor PWM signal on TMR0
 unsigned short PWM_max = 0;         // what motor_PWM_cnt counts up to, changes based on Motor_PWM_status
 unsigned short motor_speed = 0;     // speed (0-65535) of motor
 unsigned char motor_orientation = 0;// orientation (0=CW, 1=CCW)
-
+uint8_t fall_status = 0;            // bit to detect if bot has fallen and toggles RC1 LED
 
 // Blink Alive Variables
 unsigned long temp = 0;                  // temp counter for blink alive
@@ -56,9 +56,7 @@ uint8_t readMask = 0b10000000;      // mask for addresses (MSB=1 for Read per IM
 uint8_t IMU_identity = 0;           // IMU identity from calling IMU_whoami. Should always be 0xEA if IMU SPI is working
 uint8_t IMU_read_garbage = 0;       // write only dump variable for IMU SPI communication, should never be read from because contents is variable
 uint8_t IMU_output = 0;             // output variable for IMU responses
-uint8_t AccelXLow = 0;              // variable for accelerometer output X, low
-uint8_t AccelXHigh = 0;             // variable for accelerometer output X, high
-uint16_t AccelX = 0;                // variable for accelerometer output X, combined
+int16_t AccelZ = 0;                // variable for accelerometer output Z, combined
 uint16_t Gyro = 0;
 
 // SPI bit bang stuff
@@ -74,6 +72,7 @@ void Initial(void);                 // Function to initialize hardware and inter
 
 // Motor Driver Functions
 void TMR0handler(void);             // function for lowpri interrupts
+void FallCondition(void);           // function to detect if bot has fallen and toggles RC1 LED
 
 // Blink Alive Functions
 void BlinkAlive(void);              // blink LED's forever so I know the board is doing something
@@ -83,11 +82,12 @@ uint8_t WriteIMU(uint8_t address, uint8_t command, uint8_t reg); // master funct
 uint8_t ReadIMU(uint8_t address, uint8_t reg);   // master function for reading IMU by address. Returns output from IMU
 void IMU_whoami(void);              // function to verify IMU is working properly
 void IMU_BSR0_Select(void);         // function to force select user bank 0 on IMU
-void IMU_AccelX(void);               // function to read accelerometer
+void IMU_AccelZ(void);               // function to read accelerometer
 void IMU_gyro(void);                // funciton to read gyro
 void SPIGenOutArray(uint8_t data); // function to convert address into array of ones and zeros
 uint8_t SPIGenInArray(void);        // function to convert data recieved from SPI into hex value
 void SPITransmit(void);     // function to transmit SPI data
+
 
 /******************************************************************************
  * main()
@@ -99,7 +99,8 @@ void main(){
       while(1) {                   // do this loop forever
 //          IMU_AccelX();
 //          ReadIMU(0x22, 1);
-          IMU_whoami();
+          IMU_AccelZ();
+          FallCondition();
           motor_speed = 200;
           motor_orientation = 0;
           MotorDriver(motor_speed, motor_orientation);  // takes two inputs (speed (0-255) and orientation (0=CW, 1=CCW) )
@@ -164,7 +165,9 @@ void Initial() {
     INTCONbits.GIEL = 1;            // Enable low-priority interrupts to CPU
     INTCONbits.GIEH = 1;            // Enable all interrupts
     
-//    initialize IMU
+//    initialize IMU inspired by https://os.mbed.com/users/jmar7/code/LSM9DS1_Library//file/87d535bf8c53/LSM9DS1.cpp/
+    WriteIMU(0x1F, 0x38, 0);        // turn on X,Y,Z accel
+    WriteIMU(0x20, 0xC0, 0);        // set ODR to 952Hz
     
     
     T0CONbits.TMR0ON = 1;           // Turning on TMR0
@@ -179,10 +182,14 @@ void IMU_whoami(){
 }
 
 void IMU_AccelZ(){
-    uint8_t AccelAddressH = 0x2C;
-    uint8_t AccelAddressL = 0x2D;
-    AccelXLow = ReadIMU(AccelAddressL, 0);
-    AccelXHigh = ReadIMU(AccelAddressH, 0);
+    uint16_t temp = 0x0000;                         // temp variable to do manipulation within
+    uint8_t AccelAddressH = 0x2D;                   // Set address of Z axis high byte
+    uint8_t AccelAddressL = 0x2C;                   // set address of Z axis low byte
+    uint8_t AccelZLow = ReadIMU(AccelAddressL, 0);  // capture z axis low byte
+    uint8_t AccelZHigh = ReadIMU(AccelAddressH, 0); // capture z axis high byte (note that this is 2s complement so MSB is +/-)
+    temp = temp | AccelZLow;                        // mask low byte w/ temp
+    temp = temp | (AccelZHigh << 8);                // mask bit shifted high byte with temp
+    AccelZ = temp;
 }
     
 
@@ -228,16 +235,27 @@ void IMU_gyro(){
     
 }
 
+void FallCondition(){
+    if(AccelZ < 6000 && AccelZ > -6000){
+        fall_status = 0;        // update fall status and toggle indicator LED
+        LATCbits.LATC1 = 0;
+    }
+    else{
+        fall_status = 1;
+        LATCbits.LATC1 = 1;
+    }
+    return;
+}
 
 void BlinkAlive(){
     // lazily blink onboard LED's forever so I know the MPU is doing something
     // count up to some arbitrary value and flip outputs to LEDs
-    if(LATCbits.LATC0 == 0 && temp == 10000){
+    if(LATCbits.LATC0 == 0 && temp == 1000){
             LATCbits.LATC0 = 1;     // yellow light is alive LED
             
             temp = 0;
         }
-    if(LATCbits.LATC0 != 0  && temp == 10000){
+    if(LATCbits.LATC0 != 0  && temp == 1000){
             LATCbits.LATC0 = 0;     // yellow light is alive LED
             
             
@@ -254,8 +272,8 @@ void MotorDriver(unsigned char speed, unsigned char orientation){
     // update value of the PWMA pin on motor driver to match the PWM status on TMR0
     _MD_PWMA = Motor_PWM_status;
     
-    // check if speed = 0, if yes set standby bit low so motors don't operate
-    if(speed == 0){
+    // check if speed = 0 or if fall condition bit it high; if yes set standby bit low so motors don't operate
+    if(speed == 0 || fall_status == 1){
         _MD_STBY = 0;
     }
     
