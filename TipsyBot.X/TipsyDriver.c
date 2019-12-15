@@ -58,18 +58,16 @@ uint8_t dt = 10;                    // discretized time step in ms
 double theta = 0;                   // Tipsy angle measured from the vertical position (standing condition theta = 0)
 double errork;                      // error  at time step k (error = theta - target angle, target angle = 0)
 double errork1;                     // error  at time step k-1
-double PID_out;                    // PID output
+double PID_out;                     // PID output
 double pfactor;
 double dfactor;
 double ifactor;
 double imax = 200;
-double PID_max;                     // maximum value from PID controller, used for scaling motor control
-double PID_min;                     // minimum value from PID controller (can be negative)
 #define PI 3.1415       
-#define Kp 65
-#define Kd 35
-#define Ki 0.8
-#define speed_scale 1               // scaling factor for motor speed
+double Kp = 110;
+double Kd = 130;
+double Ki = 15;
+double alpha = 0.99;                 // complementary filter scaling factor
 #define target_angle 0
 
 /******************************************************************************
@@ -110,7 +108,7 @@ void main(){
             FallCondition();          // check to see if fallen over
             TipsyController();        // control algorithm that updates global variables motor_speed, motor_orientation
             MotorDriver(motor_speed, motor_orientation);  // takes two inputs (speed (0-255) and orientation (0=CW, 1=CCW) )
-          __delay_ms(dt);           // delay for discretized control loop between state k-1 and k
+            __delay_ms(dt);           // delay for discretized control loop between state k-1 and k
       }
 }
 
@@ -254,11 +252,11 @@ void TipsyController(){
     PID_Controller();
     if(PID_out < 0){
         motor_orientation = 1;                         // CCW motor input
-        motor_speed = (int) -speed_scale*255*PID_out;  // empirical scale and cast to int 
+        motor_speed = (int) -PID_out;  // empirical scale and cast to int 
     }
     else{
         motor_orientation = 0;                          // CW motor input
-        motor_speed = (int) speed_scale*255*PID_out;    //  empirical scale and cast to int 
+        motor_speed = (int) PID_out;    //  empirical scale and cast to int 
     }
     
     INTCONbits.GIEL = 1;            // Enable low-priority interrupts to CPU
@@ -266,7 +264,6 @@ void TipsyController(){
 }
 
 void SensorFusion(){
-    double alpha = 0.99;                                            // complementary filter scaling factor
     double theta_accel = atan2((double) AccelZ, (double) AccelX);   // interpret theta from accelerometer (atan2 returns radians)
     theta_accel = -theta_accel * 180/PI;                            // convert from radians to degrees
     double theta_gyro = (double) GyroY * 0.00875 * dt/1000;         // interpret theta from gyro, sensitivity is 245 dps. Factor comes from sparkfun code
@@ -274,8 +271,8 @@ void SensorFusion(){
 }
 
 void FallCondition(){
-    if(AccelZ < 10000 && AccelZ > -10000){
-        fall_status = 0;        // update fall status and toggle indicator LED
+    if(AccelZ < 6000 && AccelZ > -6000){
+        fall_status = 0;                                            // update fall status and toggle indicator LED
         LATCbits.LATC1 = 0;
     }
     else{
@@ -302,12 +299,6 @@ void PID_Controller(){
     }
     
     PID_out = pfactor + dfactor + ifactor;  // update PID output
-    if(PID_out < PID_min && fall_status == 0){                  // start with tipsy bot on back and on front to establish PID bounds for calibration (bounded by fall status)
-        PID_min = PID_out;
-    }
-    if(PID_out > PID_max && fall_status == 0){
-        PID_max = PID_out;
-    }
 }
 
 /******************************************************************************
@@ -321,13 +312,10 @@ void BlinkAlive(){
     // count up to some arbitrary value and flip outputs to LEDs
     if(LATCbits.LATC0 == 0 && temp == 3000){
             LATCbits.LATC0 = 1;     // yellow light is alive LED
-            
             temp = 0;
         }
     if(LATCbits.LATC0 != 0  && temp == 3000){
             LATCbits.LATC0 = 0;     // yellow light is alive LED
-            
-            
             temp = 0;
         }
     
