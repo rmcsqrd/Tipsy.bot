@@ -6,13 +6,7 @@
  * Pragma and high level definitions modified from ASEN5519 lab 6 source code. Reference
  * in line citations.
  * 
- * Description
- * Driver for inverted pendulum robot 
- *******************************************************************************
- *
- * Program hierarchy 
-
- ******************************************************************************/
+ **************************************************************************************/
 
 // import standard libraries
 #include <xc.h>
@@ -64,7 +58,7 @@ double dfactor;
 double ifactor;
 double imax = 200;
 #define PI 3.1415       
-double Kp = 110;
+double Kp = 110;                    // PID tuning variables
 double Kd = 130;
 double Ki = 15;
 double alpha = 0.99;                 // complementary filter scaling factor
