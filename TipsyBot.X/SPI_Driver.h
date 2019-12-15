@@ -51,6 +51,27 @@ uint8_t SPIGenInArray(void);
  ******************************************************************************/
 void SPITransmit(void);
 
+/******************************************************************************
+ *     Function Name:	WriteIMU
+ *     Parameters:      address, command, reg
+ *     Description:		This function writes to the IMU. It passes the IMU 
+ *                      address and command via SPI communication to the
+ *                      appropriate IMU register. Reg is 0 for Accel/Gyro
+ *                      register bank and 1 for magnetometer bank.
+ *
+ ******************************************************************************/
+uint8_t WriteIMU(uint8_t, uint8_t, uint8_t);
+
+/******************************************************************************
+ *     Function Name:	ReadIMU
+ *     Parameters:      address, reg
+ *     Description:		This function is identitcal to WriteIMU except that it
+ *                      masks the "readMask" (makes MSB of address a 1) and 
+ *                      sends dummy data.
+ *
+ ******************************************************************************/
+uint8_t ReadIMU(uint8_t, uint8_t);  
+
 
 #endif
 

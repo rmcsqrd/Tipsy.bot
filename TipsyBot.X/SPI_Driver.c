@@ -49,3 +49,40 @@ void SPITransmit(void){
         cnt++;
     }
 }
+
+uint8_t WriteIMU(uint8_t address, uint8_t command, uint8_t reg){   
+    INTCONbits.GIEL = 0;            // Disable low-priority interrupts to CPU
+    INTCONbits.GIEH = 0;            // Disable all interrupts    
+    
+    
+    if (reg == 0){                  // 0 = accel
+        LATBbits.LATB4 = 0;             // write CS low to initiate transfer
+    }
+    if(reg == 1){                   // 1 = mag
+        LATBbits.LATB3 = 0;             // write CS low to initiate transfer
+    }
+    __delay_us(3);                  // wait a little bit
+    SPIGenOutArray(address);        // generate the address transmit array
+    SPITransmit();                  // transmit the address
+    LATCbits.LATC7 = 1;             // drive SDO high between address and command transmit
+    __delay_us(3);                  // wait a little bit
+    SPIGenOutArray(command);        // generate the command transmit array
+    SPITransmit();                  // transmit the command
+    __delay_us(3);                  // wait a little bit
+    LATCbits.LATC7 = 0;             // drive the SDO line low
+
+    LATBbits.LATB4 = 1;             // drive CS high to end transfer
+    LATBbits.LATB3 = 1;             // drive CS high to end transfer
+
+    INTCONbits.GIEL = 1;            // Enable low-priority interrupts to CPU
+    INTCONbits.GIEH = 1;            // Enable all interrupts
+    
+    uint8_t results = SPIGenInArray();  // process results from SPI
+    return results;              // return IMU response after data word transmit (not sure what this should be)
+    
+}
+
+uint8_t ReadIMU(uint8_t address, uint8_t reg){             // syntax reformat lightly inspired by https://github.com/sparkfun/SparkFun_MPU-9250_Breakout_Arduino_Library/blob/master/examples/MPU9250_Debug/MPU9250_Debug.ino
+    uint8_t readMask = 0b10000000;      // mask for addresses (MSB=1 for Read per IMU documentation)
+    return WriteIMU(address | readMask, 0x00, reg); // mask address with read mask. Give garbage data to write
+}    
