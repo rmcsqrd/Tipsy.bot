@@ -57,12 +57,36 @@ double pfactor;
 double dfactor;
 double ifactor;
 double imax = 200;
-#define PI 3.1415       
+#define PI 3.1415     
+
+//ok
+//double Kp = 112;                    // PID tuning variables
+//double Kd = 147;
+//double Ki = 12.8;
+//double alpha = 0.985;                 // complementary filter scaling factor
+//#define target_angle 0.5
+
+////pretty good
+//double Kp = 111;                    // PID tuning variables
+//double Kd = 147;
+//double Ki = 12.5;
+//double alpha = 0.985;                 // complementary filter scaling factor
+//#define target_angle 0.8
+
+
+// 2nd best
+//double Kp = 110;                    // PID tuning variables
+//double Kd = 143;
+//double Ki = 11.5;
+//double alpha = 0.99;                 // complementary filter scaling factor
+//#define target_angle 2.25
+
+// best
 double Kp = 110;                    // PID tuning variables
-double Kd = 130;
-double Ki = 15;
+double Kd = 145;
+double Ki = 11.5;
 double alpha = 0.99;                 // complementary filter scaling factor
-#define target_angle 0
+#define target_angle 0.835
 
 /******************************************************************************
  * Function prototypes
@@ -265,7 +289,7 @@ void SensorFusion(){
 }
 
 void FallCondition(){
-    if(AccelZ < 6000 && AccelZ > -6000){
+    if(AccelZ < 9000 && AccelZ > -9000){
         fall_status = 0;                                            // update fall status and toggle indicator LED
         LATCbits.LATC1 = 0;
     }
