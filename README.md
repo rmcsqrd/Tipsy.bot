@@ -1,4 +1,4 @@
 # Tipsy.bot
 Inverted Pendulum Robot.
 
-[Checkout a project write-up at](https://riomcmahon.me/portfolio/tipsybot/)
+[Checkout the project write-up here](https://riomcmahon.me/portfolio/tipsybot/)
