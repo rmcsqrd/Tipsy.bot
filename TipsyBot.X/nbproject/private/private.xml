@@ -5,6 +5,7 @@
         <group>
             <file>file:/Users/riomcmahon/Grad/Fall2019/ASEN_5519/FinalProject/_Tipsy.bot/TipsyBot.X/TipsyDriver.c</file>
             <file>file:/Users/riomcmahon/Grad/Fall2019/ASEN_5519/FinalProject/_Tipsy.bot/TipsyBot.X/SPI_Driver.c</file>
+            <file>file:/Users/riomcmahon/Grad/Fall2019/ASEN_5519/FinalProject/_Tipsy.bot/TipsyBot.X/MotorDriver.c</file>
         </group>
     </open-files>
 </project-private>

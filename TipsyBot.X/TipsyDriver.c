@@ -300,24 +300,7 @@ void FallCondition(){
     return;
 }
    
-void PID_Controller(){
-//    shamelessly implemented from https://github.com/johnnyonthespot/self-balancing-robot-psoc4/blob/master/main.c
-    errork1 = errork;                       // store error at time step k-1
-    errork = theta - target_angle;          // calculate current error (deviation from vertical)
-    pfactor = Kp*errork;                    // calculate proportional term
-    dfactor = Kd*(errork-errork1);          // calculate derivative term
-    ifactor = ifactor + Ki*errork;          // calculate integral term
-    if(ifactor >= imax)
-    {
-        ifactor = imax;
-    }
-    else if(ifactor <= -imax)
-    {
-        ifactor = -imax;
-    }
-    
-    PID_out = pfactor + dfactor + ifactor;  // update PID output
-}
+ 
 
 /******************************************************************************
  * Interrupts/Status Functions
